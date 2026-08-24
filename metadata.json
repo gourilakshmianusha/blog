@@ -1,0 +1,6 @@
+{
+  "name": "BlogPulse AI - Blog Curator & SEO Writer",
+  "description": "Discover top 10 curated blogs from any website URL with sentiment analysis, image summaries, and generate full SEO-optimized blogs with strict keyword placement and backlinks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
