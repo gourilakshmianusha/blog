@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { generateStructuredFallbackBlog, generateUrlSpecificCuratedBlogs } from "./src/fallbackGenerator";
+import { generateMonthlyBlogCalendar } from "./src/monthlyCalendarGenerator";
 
 dotenv.config();
 
@@ -471,12 +472,19 @@ app.post("/api/generate-full-blog", async (req, res) => {
     const {
       title,
       focusKeyword,
-      targetAudience = "Industry Professionals, Tech Enthusiasts, and Decision Makers",
-      tone = "Authoritative, engaging, and clear",
+      category,
+      summary,
+      keyTakeaways,
+      targetAudience = "Industry Specialists, Practitioners, and Enthusiasts",
+      tone = "Authoritative, insightful, and actionable",
       sourceUrl,
       wordCountTarget = 1400,
       engineMode,
       customApiKey,
+      imageUrl,
+      imagePrompt,
+      imageVisualTheme,
+      backlinks: passedBacklinks,
     } = req.body;
 
     if (!title || typeof title !== "string") {
@@ -494,36 +502,51 @@ app.post("/api/generate-full-blog", async (req, res) => {
       const fallbackBlog = generateStructuredFallbackBlog({
         title,
         focusKeyword: primaryKeyword,
+        category,
+        summary,
+        keyTakeaways,
         targetAudience,
         tone,
         wordCountTarget,
         sourceUrl,
+        imageUrl,
+        imagePrompt,
+        imageVisualTheme,
+        backlinks: passedBacklinks,
       });
       res.json(fallbackBlog);
       return;
     }
 
-    const prompt = `You are a world-class SEO content director and award-winning tech journalist.
-Write a COMPLETE, comprehensive, publication-ready, deeply informative blog post based on:
+    const prompt = `You are a world-class domain journalist, senior technical researcher, and expert SEO content director.
+Write a COMPLETE, deeply authoritative, comprehensive, 100% domain-specific publication-ready blog post for:
+
+TOPIC / TITLE: "${title}"
+FOCUS KEYWORD: "${primaryKeyword}"
+${category ? `CATEGORY / DOMAIN: "${category}"` : ""}
+${summary ? `CORE SUMMARY & CONTEXT: "${summary}"` : ""}
+${keyTakeaways && Array.isArray(keyTakeaways) ? `KEY TAKEAWAYS TO ELABORATE: ${keyTakeaways.join("; ")}` : ""}
+${sourceUrl ? `SOURCE CONTEXT: ${sourceUrl}` : ""}
+${imageUrl ? `HERO IMAGE URL: ${imageUrl}` : ""}
 
 CRITICAL SEO SPECIFICATIONS (MUST BE STRICTLY FOLLOWED):
 1. **Focus Keyword**: "${primaryKeyword}"
-2. **RULE 1 - TITLE**: The Focus Keyword "${primaryKeyword}" MUST be present in the Title.
-3. **RULE 2 - META DESCRIPTION**: The Focus Keyword "${primaryKeyword}" MUST be present in the Meta Description (between 140-160 characters).
+2. **RULE 1 - TITLE (H1)**: The Focus Keyword "${primaryKeyword}" MUST be explicitly included in the Title.
+3. **RULE 2 - META DESCRIPTION**: The Focus Keyword "${primaryKeyword}" MUST be present in the Meta Description (140-160 characters).
 4. **RULE 3 - FIRST SENTENCE OF FIRST PARAGRAPH**: The Focus Keyword "${primaryKeyword}" MUST be explicitly written in the VERY FIRST SENTENCE of the first paragraph!
-5. **Backlinks & Authority Citations**: Embed at least 4-5 high quality contextual backlinks and research citations with anchor text.
-6. **Structure**: 
-   - Compelling Hook & Introduction (with Rule 3 strictly satisfied)
+5. **Domain Authenticity**: Tailor the entire article strictly to its specific niche (e.g. if Astrology/Vedic, use planetary transits, Nakshatras, house activations, and Upayas; if Health, use biomarkers, vagal tone, and circadian biology; if NGO, use community appraisal and SDG metrics; if Marketing, use generative search and entity SEO; if Tech, use architectures and benchmarks).
+6. **Backlinks & Authority Citations**: Embed at least 4 high-authority, contextual backlink references with realistic Markdown anchor links [anchor text](url) to reputable institutions (e.g., NASA, NIH/PubMed, W3C, Stanford, UN SDGs, Search Engine Land, etc.).
+7. **Structure**: 
+   - Compelling Hook & Introduction (Rule 3 strictly satisfied)
    - Table of Contents
-   - In-depth H2 sections (with H3 subsections) covering foundational mechanics, practical implementation, benchmarks, real-world case studies, and future outlook.
-   - Comparison tables / bullet lists / code or technical snippets where relevant.
-   - Comprehensive FAQ section (3-4 questions).
-   - Key Takeaways & Conclusion with actionable Next Steps.
+   - In-depth H2 sections (with H3 subsections) covering foundations, mechanisms, benchmarks, real-world case studies, and actionable steps.
+   - Markdown comparison tables and bullet points.
+   - Comprehensive FAQ section (3-4 domain-specific Q&As).
+   - Key Takeaways & Actionable Conclusion.
 
 Target Audience: ${targetAudience}
 Tone: ${tone}
 Approximate Word Count: ${wordCountTarget} words.
-${sourceUrl ? `Inspired by context from: ${sourceUrl}` : ""}
 
 Return a JSON object with:
 {
@@ -537,15 +560,15 @@ Return a JSON object with:
   "wordCount": 1450,
   "firstParagraph": "...",
   "tableOfContents": ["1. Introduction...", "2. ..."],
-  "contentMarkdown": "# Title\\n\\n[Full rich markdown content including all headings, lists, quotes, tables, and embedded backlinks formatted as [anchor text](url)]",
+  "contentMarkdown": "# Title\\n\\n[Full rich markdown content with all headings, lists, tables, and embedded backlinks formatted as [anchor text](url)]",
   "keyTakeaways": ["Takeaway 1", "Takeaway 2", "Takeaway 3", "Takeaway 4"],
   "backlinks": [
     {
-      "sourceName": "Source Name (e.g. Google Developers, Stanford Research, W3C)",
+      "sourceName": "Source Name (e.g. PubMed, NASA JPL, W3C, UN SDGs)",
       "url": "https://...",
       "anchorText": "...",
-      "type": "External Authority",
-      "domainAuthorityEst": "DA 92",
+      "type": "Canonical Source",
+      "domainAuthorityEst": "DA 95",
       "contextSnippet": "Why this backlink was used"
     }
   ],
@@ -556,7 +579,7 @@ Return a JSON object with:
     "prompt": "Detailed AI image generation prompt for the hero banner",
     "altText": "SEO optimized alt text containing ${primaryKeyword}",
     "caption": "Caption describing the visual concept",
-    "imageUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80"
+    "imageUrl": "${imageUrl || 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80'}"
   },
   "seoChecklist": {
     "keywordInTitle": true,
@@ -564,7 +587,7 @@ Return a JSON object with:
     "keywordInFirstSentence": true,
     "keywordDensityPercent": 1.8,
     "readabilityScore": "Grade 8 - Excellent Clarity",
-    "headingCount": { "h2": 5, "h3": 8 },
+    "headingCount": { "h2": 6, "h3": 7 },
     "totalBacklinks": 4
   }
 }
@@ -582,10 +605,17 @@ Return ONLY raw JSON.`;
       const fallbackBlog = generateStructuredFallbackBlog({
         title,
         focusKeyword: primaryKeyword,
+        category,
+        summary,
+        keyTakeaways,
         targetAudience,
         tone,
         wordCountTarget,
         sourceUrl,
+        imageUrl,
+        imagePrompt,
+        imageVisualTheme,
+        backlinks: passedBacklinks,
       });
       res.json(fallbackBlog);
       return;
@@ -603,10 +633,17 @@ Return ONLY raw JSON.`;
         const fallbackBlog = generateStructuredFallbackBlog({
           title,
           focusKeyword: primaryKeyword,
+          category,
+          summary,
+          keyTakeaways,
           targetAudience,
           tone,
           wordCountTarget,
           sourceUrl,
+          imageUrl,
+          imagePrompt,
+          imageVisualTheme,
+          backlinks: passedBacklinks,
         });
         res.json(fallbackBlog);
         return;
@@ -628,7 +665,7 @@ Return ONLY raw JSON.`;
     let finalFirstParagraph = blogData.firstParagraph || `In today's fast-evolving landscape, understanding ${primaryKeyword} has become indispensable for forward-thinking organizations.`;
     const sentences = finalFirstParagraph.split(/(?<=[.?!])\s+/);
     if (sentences.length > 0 && !sentences[0].toLowerCase().includes(fkLower)) {
-      finalFirstParagraph = `In today's fast-evolving technology landscape, mastering ${primaryKeyword} has emerged as an indispensable operational advantage. ` + finalFirstParagraph;
+      finalFirstParagraph = `In today's fast-evolving domain landscape, mastering ${primaryKeyword} has emerged as an indispensable operational advantage. ` + finalFirstParagraph;
     }
 
     const result = {
@@ -639,7 +676,7 @@ Return ONLY raw JSON.`;
       firstParagraph: finalFirstParagraph,
       featuredImage: {
         ...blogData.featuredImage,
-        imageUrl: blogData.featuredImage?.imageUrl || "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
+        imageUrl: imageUrl || blogData.featuredImage?.imageUrl || "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
       },
       seoChecklist: {
         keywordInTitle: finalTitle.toLowerCase().includes(fkLower),
@@ -657,10 +694,178 @@ Return ONLY raw JSON.`;
   } catch (err: any) {
     console.error("Error in generate-full-blog endpoint, serving structured fallback:", err);
     const fallbackBlog = generateStructuredFallbackBlog({
-      title: req.body?.title || "Next-Gen AI Workflows in 2026",
-      focusKeyword: req.body?.focusKeyword || "AI Workflows",
+      title: req.body?.title || "Next-Gen Domain Workflows in 2026",
+      focusKeyword: req.body?.focusKeyword || "Domain Workflows",
+      category: req.body?.category,
+      summary: req.body?.summary,
+      keyTakeaways: req.body?.keyTakeaways,
+      imageUrl: req.body?.imageUrl,
+      imagePrompt: req.body?.imagePrompt,
+      imageVisualTheme: req.body?.imageVisualTheme,
+      backlinks: req.body?.backlinks,
     });
     res.json(fallbackBlog);
+  }
+});
+
+// 3. Generate 30/31-Day Monthly Content Calendar
+app.post("/api/generate-monthly-calendar", async (req, res) => {
+  try {
+    const {
+      year = 2026,
+      month = 8, // 1 to 12
+      category = "AI & Machine Learning",
+      websiteUrl = "https://techcrunch.com",
+      engineMode,
+      customApiKey,
+    } = req.body;
+
+    const cleanUrl = (websiteUrl || "https://techcrunch.com").trim();
+    const domain = cleanUrl.replace(/^https?:\/\//i, "").split("/")[0] || "techcrunch.com";
+
+    // If offline deterministic engine is selected or for fast response
+    if (engineMode === "offline") {
+      const calendar = generateMonthlyBlogCalendar(Number(year), Number(month), category, cleanUrl, domain);
+      res.json(calendar);
+      return;
+    }
+
+    // Try Gemini AI generation with fallback
+    try {
+      const totalDays = new Date(Number(year), Number(month), 0).getDate();
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const monthName = monthNames[Math.max(0, Math.min(11, Number(month) - 1))];
+
+      const prompt = `You are a chief SEO content strategist and editorial director.
+Create a comprehensive, non-repetitive, highly engaging 30 or 31-day editorial content calendar for the entire month of ${monthName} ${year} (Total Days: ${totalDays}).
+
+Niche / Category: "${category}"
+Domain / Brand Context: "${domain}" (${cleanUrl})
+
+CRITICAL SEO SPECIFICATIONS FOR EVERY SINGLE DAY (Days 1 to ${totalDays}):
+- Each day must feature an original, high-converting Title
+- Each day must have a distinct Focus Keyword that is naturally present in the Title and Meta Description
+- Meta Description (140-160 characters)
+- Content Type ('How-To Guide', 'Deep Dive Analysis', 'Case Study & Teardown', 'Trend Forecast', 'Checklist & Framework', 'Myth Busting', 'Expert Round-up', 'Infographic Blueprint')
+- Estimated Read Time (e.g. '6 min read')
+- 3 key takeaways
+- Sentiment analysis (score from -1.0 to 1.0, label, tone)
+- Feature image prompt (describing a visually stunning hero banner related to that day's blog title) and visual theme
+
+Return a JSON object with this exact structure:
+{
+  "month": ${Number(month)},
+  "monthName": "${monthName}",
+  "year": ${Number(year)},
+  "totalDays": ${totalDays},
+  "category": "${category}",
+  "websiteUrl": "${cleanUrl}",
+  "domain": "${domain}",
+  "themeOverview": "...",
+  "weeklyThemes": [
+    { "week": 1, "title": "...", "description": "..." },
+    { "week": 2, "title": "...", "description": "..." },
+    { "week": 3, "title": "...", "description": "..." },
+    { "week": 4, "title": "...", "description": "..." }
+  ],
+  "days": [
+    {
+      "dayNumber": 1,
+      "dateFormatted": "${monthName.substring(0, 3)} 1, ${year}",
+      "dayOfWeek": "...",
+      "weekNumber": 1,
+      "title": "...",
+      "focusKeyword": "...",
+      "metaDescription": "...",
+      "contentType": "How-To Guide",
+      "contentAngle": "...",
+      "targetAudience": "...",
+      "estimatedReadTime": "6 min read",
+      "keyTakeaways": ["...", "...", "..."],
+      "sentiment": { "score": 0.8, "label": "Positive", "tone": "..." },
+      "featureImage": {
+        "description": "...",
+        "prompt": "...",
+        "visualTheme": "...",
+        "aspectRatio": "16:9",
+        "suggestedAltText": "..."
+      },
+      "backlinks": [
+        { "sourceName": "...", "url": "https://...", "anchorText": "...", "type": "External Authority", "domainAuthorityEst": "DA 90" }
+      ]
+    }
+  ]
+}
+Ensure there are exactly ${totalDays} items in the "days" array from dayNumber 1 to ${totalDays}. Return ONLY raw JSON.`;
+
+      const response = await callGeminiWithFallback(prompt, {
+        responseMimeType: "application/json",
+        customApiKey,
+      });
+
+      let parsed: any;
+      try {
+        parsed = JSON.parse(response.text || "{}");
+      } catch {
+        const cleaned = (response.text || "{}").replace(/```json/g, "").replace(/```/g, "").trim();
+        parsed = JSON.parse(cleaned);
+      }
+
+      if (parsed && Array.isArray(parsed.days) && parsed.days.length >= totalDays - 2) {
+        // Merge image URLs with category image repository
+        const fallbackCal = generateMonthlyBlogCalendar(Number(year), Number(month), category, cleanUrl, domain);
+        const mergedDays = parsed.days.map((d: any, idx: number) => {
+          const fallbackDay = fallbackCal.days[idx] || fallbackCal.days[0];
+          return {
+            ...d,
+            id: `cal-day-${year}-${month}-${d.dayNumber || idx + 1}`,
+            dayNumber: d.dayNumber || idx + 1,
+            dateFormatted: d.dateFormatted || fallbackDay.dateFormatted,
+            dayOfWeek: d.dayOfWeek || fallbackDay.dayOfWeek,
+            weekNumber: d.weekNumber || Math.min(5, Math.ceil((idx + 1) / 7)),
+            category,
+            status: "Scheduled",
+            featureImage: {
+              ...d.featureImage,
+              imageUrl: fallbackDay.featureImage.imageUrl,
+              aspectRatio: "16:9",
+              visualTheme: d.featureImage?.visualTheme || fallbackDay.featureImage.visualTheme,
+            },
+            backlinks: (d.backlinks && d.backlinks.length > 0) ? d.backlinks : fallbackDay.backlinks,
+          };
+        });
+
+        res.json({
+          month: Number(month),
+          monthName,
+          year: Number(year),
+          totalDays,
+          category,
+          websiteUrl: cleanUrl,
+          domain,
+          solarIngress: parsed.solarIngress || fallbackCal.solarIngress,
+          seasonalFocus: parsed.seasonalFocus || fallbackCal.seasonalFocus,
+          themeOverview: parsed.themeOverview || fallbackCal.themeOverview,
+          weeklyThemes: parsed.weeklyThemes || fallbackCal.weeklyThemes,
+          days: mergedDays,
+          generatedAt: new Date().toISOString(),
+        });
+        return;
+      }
+    } catch (aiErr) {
+      console.warn("AI generation for calendar failed or rate-limited, serving deterministic calendar:", aiErr);
+    }
+
+    // Default to high-craft deterministic calendar
+    const calendar = generateMonthlyBlogCalendar(Number(year), Number(month), category, cleanUrl, domain);
+    res.json(calendar);
+  } catch (err: any) {
+    console.error("Error in generate-monthly-calendar:", err);
+    const fallbackCal = generateMonthlyBlogCalendar(2026, 8, req.body?.category || "AI & Machine Learning");
+    res.json(fallbackCal);
   }
 });
 

@@ -9,13 +9,29 @@ interface UrlSearchBarProps {
   setEngineMode: (mode: 'offline' | 'cloud') => void;
 }
 
+const CATEGORY_DEFAULT_URLS: Record<string, string> = {
+  'Astrology': 'https://astrology.com',
+  'Health': 'https://healthline.com',
+  'Digital': 'https://digitaltrends.com',
+  'AI': 'https://openai.com/news',
+  'NGO': 'https://charitynavigator.org',
+  'Growth & SEO': 'https://searchenginejournal.com',
+  'Cloud Infrastructure': 'https://aws.amazon.com/blogs',
+  'Cybersecurity': 'https://krebsonsecurity.com',
+  'Design & UX': 'https://smashingmagazine.com',
+  'Data & Analytics': 'https://towardsdatascience.com',
+  'Green Tech': 'https://cleantechnica.com',
+  'Web Engineering': 'https://dev.to',
+};
+
 const PRESET_SITES = [
+  { name: 'Astrology.com', url: 'https://astrology.com', category: 'Astrology', color: 'bg-indigo-50 text-indigo-800 border-indigo-200' },
+  { name: 'Healthline', url: 'https://healthline.com', category: 'Health & Wellness', color: 'bg-rose-50 text-rose-800 border-rose-200' },
+  { name: 'Digital Trends', url: 'https://digitaltrends.com', category: 'Digital Tech', color: 'bg-blue-50 text-blue-800 border-blue-200' },
+  { name: 'OpenAI Blog', url: 'https://openai.com/news', category: 'AI & Research', color: 'bg-purple-50 text-purple-800 border-purple-200' },
+  { name: 'Charity Navigator', url: 'https://charitynavigator.org', category: 'NGO & Non-Profit', color: 'bg-teal-50 text-teal-800 border-teal-200' },
   { name: 'TechCrunch', url: 'https://techcrunch.com', category: 'AI & Startups', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  { name: 'The Verge', url: 'https://theverge.com', category: 'Consumer Tech', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  { name: 'Search Engine Journal', url: 'https://searchenginejournal.com', category: 'SEO & Content', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  { name: 'Smashing Magazine', url: 'https://smashingmagazine.com', category: 'Web Dev & Design', color: 'bg-rose-50 text-rose-700 border-rose-200' },
-  { name: 'HubSpot Blog', url: 'https://blog.hubspot.com', category: 'Marketing & Sales', color: 'bg-amber-50 text-amber-800 border-amber-200' },
-  { name: 'MIT Tech Review', url: 'https://technologyreview.com', category: 'Deep Tech & Science', color: 'bg-cyan-50 text-cyan-800 border-cyan-200' },
+  { name: 'Search Engine Journal', url: 'https://searchenginejournal.com', category: 'SEO & Growth', color: 'bg-amber-50 text-amber-800 border-amber-200' },
   { name: 'Wired', url: 'https://wired.com', category: 'Culture & Systems', color: 'bg-stone-100 text-stone-800 border-stone-300' },
 ];
 
@@ -35,9 +51,22 @@ export const UrlSearchBar: React.FC<UrlSearchBarProps> = ({
     onAnalyze(inputUrl.trim(), topic.trim() || undefined);
   };
 
-  const handleSelectPreset = (presetUrl: string) => {
+  const handleSelectPreset = (presetUrl: string, presetCategory?: string) => {
     setInputUrl(presetUrl);
-    onAnalyze(presetUrl, topic.trim() || undefined);
+    if (presetCategory) {
+      setTopic(presetCategory);
+    }
+    onAnalyze(presetUrl, presetCategory || topic.trim() || undefined);
+  };
+
+  const handleSelectCategory = (catName: string) => {
+    setTopic(catName);
+    // If the input url is empty, default to the category's canonical site, otherwise use current URL
+    const targetUrl = inputUrl.trim() || CATEGORY_DEFAULT_URLS[catName] || 'https://techcrunch.com';
+    if (!inputUrl.trim()) {
+      setInputUrl(targetUrl);
+    }
+    onAnalyze(targetUrl, catName);
   };
 
   return (
@@ -96,15 +125,24 @@ export const UrlSearchBar: React.FC<UrlSearchBarProps> = ({
           {/* Subtopic Optional input & Engine Mode Switch */}
           <div className="mt-3 flex flex-wrap items-center justify-between text-xs text-stone-500 px-2 gap-2">
             <div className="flex items-center space-x-2">
-              <span>Optional Niche / Filter:</span>
+              <span className="font-medium text-stone-600">Category / Niche:</span>
               <input
                 id="optional-topic-input"
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                placeholder="e.g. AI Agents, SEO Trends, Design..."
-                className="px-2.5 py-1 text-xs border border-stone-200 rounded-md bg-white focus:outline-none focus:border-stone-500 w-40 sm:w-56"
+                placeholder="e.g. Artificial Intelligence, SEO, Cloud..."
+                className="px-2.5 py-1 text-xs border border-stone-200 rounded-md bg-white focus:outline-none focus:border-stone-500 w-44 sm:w-60"
               />
+              {topic && (
+                <button
+                  type="button"
+                  onClick={() => setTopic('')}
+                  className="text-[10px] text-stone-400 hover:text-stone-600 underline"
+                >
+                  clear
+                </button>
+              )}
             </div>
 
             <div className="flex items-center space-x-2">
@@ -123,6 +161,39 @@ export const UrlSearchBar: React.FC<UrlSearchBarProps> = ({
               </button>
             </div>
           </div>
+
+          {/* Quick Category Suggestions Chips */}
+          <div className="mt-2.5 px-2 flex flex-wrap items-center gap-1.5 text-[11px]">
+            <span className="text-stone-400 mr-1">Categories:</span>
+            {[
+              'Astrology',
+              'Health',
+              'Digital',
+              'AI',
+              'NGO',
+              'Growth & SEO',
+              'Cloud Infrastructure',
+              'Cybersecurity',
+              'Design & UX',
+              'Data & Analytics',
+              'Green Tech',
+              'Web Engineering'
+            ].map((catName) => (
+              <button
+                key={catName}
+                id={`cat-chip-${catName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                type="button"
+                onClick={() => handleSelectCategory(catName)}
+                className={`px-2.5 py-0.5 rounded-md border text-[11px] font-medium transition-all cursor-pointer ${
+                  topic.toLowerCase() === catName.toLowerCase()
+                    ? 'bg-stone-900 text-white border-stone-900 shadow-2xs'
+                    : 'bg-stone-50 hover:bg-stone-100 text-stone-700 border-stone-200'
+                }`}
+              >
+                {catName}
+              </button>
+            ))}
+          </div>
         </form>
 
         {/* Quick Presets */}
@@ -137,9 +208,9 @@ export const UrlSearchBar: React.FC<UrlSearchBarProps> = ({
                 key={site.url}
                 id={`preset-${site.name.toLowerCase().replace(/\s+/g, '-')}`}
                 type="button"
-                onClick={() => handleSelectPreset(site.url)}
+                onClick={() => handleSelectPreset(site.url, site.category)}
                 disabled={isLoading}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center space-x-1.5 ${site.color}`}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center space-x-1.5 cursor-pointer ${site.color}`}
               >
                 <span>{site.name}</span>
                 <span className="text-[10px] opacity-70">({site.category})</span>

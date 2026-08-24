@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { WebsiteAnalysisResult, CuratedBlogItem, CompleteBlogData } from './types';
+import { WebsiteAnalysisResult, CuratedBlogItem, CompleteBlogData, MonthlyContentCalendarResult, CalendarDayBlogItem } from './types';
 import { Header } from './components/Header';
 import { UrlSearchBar } from './components/UrlSearchBar';
 import { CuratedBlogsDashboard } from './components/CuratedBlogsDashboard';
+import { MonthlyContentCalendar } from './components/MonthlyContentCalendar';
 import { CompleteBlogStudio } from './components/CompleteBlogStudio';
 import { BacklinkIntelligenceMatrix } from './components/BacklinkIntelligenceMatrix';
 import { SeoRulesVerificationView } from './components/SeoRulesVerificationView';
-import { Loader2, AlertCircle, Sparkles, Compass } from 'lucide-react';
+import { generateMonthlyBlogCalendar } from './monthlyCalendarGenerator';
+import { Loader2, AlertCircle, Sparkles, Compass, CalendarDays } from 'lucide-react';
 
 // Initial default rich data for instant interactive experience
 const INITIAL_CURATED_DATA: WebsiteAnalysisResult = {
@@ -474,10 +476,14 @@ const INITIAL_CURATED_DATA: WebsiteAnalysisResult = {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'curated' | 'generator' | 'backlinks' | 'seo-rules'>('curated');
+  const [activeTab, setActiveTab] = useState<'curated' | 'calendar' | 'generator' | 'backlinks' | 'seo-rules'>('curated');
   const [curatedData, setCuratedData] = useState<WebsiteAnalysisResult | null>(INITIAL_CURATED_DATA);
+  const [calendarData, setCalendarData] = useState<MonthlyContentCalendarResult | null>(() => 
+    generateMonthlyBlogCalendar(2026, 8, 'AI & Machine Learning', 'https://techcrunch.com', 'techcrunch.com')
+  );
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGeneratingBlog, setIsGeneratingBlog] = useState(false);
+  const [isGeneratingCalendar, setIsGeneratingCalendar] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Engine preferences: 'offline' (Instant Quota-Free) or 'cloud' (Google Gemini API)
@@ -515,6 +521,18 @@ export default function App() {
 
       const result: WebsiteAnalysisResult = await response.json();
       setCuratedData(result);
+      
+      // Also update content calendar with new domain/topic
+      const activeCat = topic || result.blogs[0]?.category || 'AI & Machine Learning';
+      const newCal = generateMonthlyBlogCalendar(
+        calendarData?.year || 2026,
+        calendarData?.month || 8,
+        activeCat,
+        result.websiteUrl,
+        result.domain
+      );
+      setCalendarData(newCal);
+
       setActiveTab('curated');
     } catch (err: any) {
       console.error('Analysis error:', err);
@@ -524,7 +542,104 @@ export default function App() {
     }
   };
 
-  // 2. Handle "Generate Complete Blog" trigger from a curated blog
+  // 2. Handle Monthly Calendar Generation & Refresh
+  const handleFetchMonthlyCalendar = async (year: number, month: number, category: string) => {
+    setIsGeneratingCalendar(true);
+    setErrorMsg(null);
+    try {
+      const response = await fetch('/api/generate-monthly-calendar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          year,
+          month,
+          category,
+          websiteUrl: curatedData?.websiteUrl || 'https://techcrunch.com',
+          engineMode,
+          customApiKey: customApiKey || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate monthly calendar.');
+      }
+
+      const calResult: MonthlyContentCalendarResult = await response.json();
+      setCalendarData(calResult);
+    } catch (err: any) {
+      console.error('Calendar generation error:', err);
+      // Resilient fallback
+      const fallbackCal = generateMonthlyBlogCalendar(
+        year,
+        month,
+        category,
+        curatedData?.websiteUrl || 'https://techcrunch.com',
+        curatedData?.domain || 'techcrunch.com'
+      );
+      setCalendarData(fallbackCal);
+    } finally {
+      setIsGeneratingCalendar(false);
+    }
+  };
+
+  // 3. Handle "Generate Complete Blog" trigger from a calendar day
+  const handleGenerateFullBlogFromCalendarDay = (day: CalendarDayBlogItem) => {
+    // Transform calendar day into CuratedBlogItem format for studio
+    const dummyCurated: CuratedBlogItem = {
+      id: day.id,
+      title: day.title,
+      author: `${day.category} Editorial Desk`,
+      publishDate: day.dateFormatted,
+      readTime: day.estimatedReadTime,
+      category: day.category,
+      url: `https://${curatedData?.domain || 'techcrunch.com'}/blog/${day.focusKeyword.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      summary: day.metaDescription,
+      keyTakeaways: day.keyTakeaways,
+      imageSummary: {
+        description: day.featureImage.description,
+        prompt: day.featureImage.prompt,
+        visualTheme: day.featureImage.visualTheme,
+        aspectRatio: day.featureImage.aspectRatio,
+        suggestedAltText: day.featureImage.suggestedAltText,
+        imageUrl: day.featureImage.imageUrl,
+      },
+      sentimentAnalysis: {
+        score: day.sentiment.score,
+        percentage: Math.round(((day.sentiment.score + 1) / 2) * 100),
+        label: day.sentiment.label as any,
+        tone: day.sentiment.tone,
+        subjectivity: 0.3,
+        emotionalDrivers: ["Relevance: 90%", "Authority: 88%"],
+        explanation: `Scheduled publication for ${day.dateFormatted} with target audience: ${day.targetAudience}.`,
+      },
+      backlinks: day.backlinks,
+      suggestedFocusKeywords: [day.focusKeyword],
+    };
+
+    setSelectedSourceBlog(dummyCurated);
+    setGeneratorTitle(day.title);
+    setGeneratorKeyword(day.focusKeyword);
+    setActiveTab('generator');
+
+    handleGenerateFullBlog({
+      title: day.title,
+      focusKeyword: day.focusKeyword,
+      sourceUrl: dummyCurated.url,
+      category: day.category,
+      summary: day.metaDescription,
+      keyTakeaways: day.keyTakeaways,
+      imageUrl: day.featureImage.imageUrl,
+      imagePrompt: day.featureImage.prompt,
+      imageVisualTheme: day.featureImage.visualTheme,
+      backlinks: day.backlinks,
+      targetAudience: day.targetAudience,
+      tone: day.sentiment.tone,
+      wordCountTarget: 1500,
+    });
+  };
+
+  // 4. Handle "Generate Complete Blog" trigger from a curated blog
   const handleSelectBlogToGenerate = (blog: CuratedBlogItem, focusKeyword?: string) => {
     setSelectedSourceBlog(blog);
     setGeneratorTitle(blog.title);
@@ -536,7 +651,14 @@ export default function App() {
       title: blog.title,
       focusKeyword: focusKeyword || blog.suggestedFocusKeywords?.[0] || 'AI Workflows',
       sourceUrl: blog.url,
-      targetAudience: 'Tech Leaders, Software Engineers, and Product Strategists',
+      category: blog.category,
+      summary: blog.summary,
+      keyTakeaways: blog.keyTakeaways,
+      imageUrl: blog.imageSummary?.imageUrl,
+      imagePrompt: blog.imageSummary?.prompt,
+      imageVisualTheme: blog.imageSummary?.visualTheme,
+      backlinks: blog.backlinks,
+      targetAudience: 'Tech Leaders, Specialists, and Practitioners',
       tone: 'Authoritative, insightful, and actionable',
       wordCountTarget: 1400,
     });
@@ -546,6 +668,13 @@ export default function App() {
   const handleGenerateFullBlog = async (params: {
     title: string;
     focusKeyword: string;
+    category?: string;
+    summary?: string;
+    keyTakeaways?: string[];
+    imageUrl?: string;
+    imagePrompt?: string;
+    imageVisualTheme?: string;
+    backlinks?: any[];
     targetAudience?: string;
     tone?: string;
     wordCountTarget?: number;
@@ -642,6 +771,25 @@ export default function App() {
           <CuratedBlogsDashboard
             data={curatedData}
             onSelectBlogToGenerate={handleSelectBlogToGenerate}
+            onCategoryChange={(category, targetUrl) => 
+              handleAnalyzeWebsite(targetUrl || curatedData?.websiteUrl || 'https://techcrunch.com', category)
+            }
+            onOpenCalendar={() => setActiveTab('calendar')}
+            isAnalyzingCategory={isAnalyzing}
+          />
+        )}
+
+        {!isAnalyzing && activeTab === 'calendar' && (
+          <MonthlyContentCalendar
+            calendarData={calendarData}
+            isLoading={isGeneratingCalendar}
+            onGenerateFullBlogFromDay={handleGenerateFullBlogFromCalendarDay}
+            onMonthChange={(year, month, category) => handleFetchMonthlyCalendar(year, month, category)}
+            onCategoryChange={(category) => {
+              const currentYear = calendarData?.year || 2026;
+              const currentMonth = calendarData?.month || 8;
+              handleFetchMonthlyCalendar(currentYear, currentMonth, category);
+            }}
           />
         )}
 

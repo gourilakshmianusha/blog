@@ -44,6 +44,13 @@ interface CompleteBlogStudioProps {
   onGenerateBlog: (params: {
     title: string;
     focusKeyword: string;
+    category?: string;
+    summary?: string;
+    keyTakeaways?: string[];
+    imageUrl?: string;
+    imagePrompt?: string;
+    imageVisualTheme?: string;
+    backlinks?: any[];
     targetAudience?: string;
     tone?: string;
     wordCountTarget?: number;
@@ -222,6 +229,13 @@ export const CompleteBlogStudio: React.FC<CompleteBlogStudioProps> = ({
     onGenerateBlog({
       title: title.trim(),
       focusKeyword: focusKeyword.trim(),
+      category: sourceBlog?.category,
+      summary: sourceBlog?.summary,
+      keyTakeaways: sourceBlog?.keyTakeaways,
+      imageUrl: activeHeroImage || sourceBlog?.imageSummary?.imageUrl,
+      imagePrompt: sourceBlog?.imageSummary?.prompt,
+      imageVisualTheme: activeImageTheme || sourceBlog?.imageSummary?.visualTheme,
+      backlinks: sourceBlog?.backlinks,
       targetAudience,
       tone,
       wordCountTarget: wordCount,
@@ -236,6 +250,13 @@ export const CompleteBlogStudio: React.FC<CompleteBlogStudioProps> = ({
     onGenerateBlog({
       title: angleItem.title,
       focusKeyword: angleItem.keyword,
+      category: sourceBlog?.category,
+      summary: sourceBlog?.summary,
+      keyTakeaways: sourceBlog?.keyTakeaways,
+      imageUrl: angleItem.imageUrl,
+      imagePrompt: angleItem.imageTheme,
+      imageVisualTheme: angleItem.imageTheme,
+      backlinks: sourceBlog?.backlinks,
       targetAudience,
       tone,
       wordCountTarget: wordCount,

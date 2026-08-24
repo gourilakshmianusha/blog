@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Sparkles, Globe, BookOpen, Link2, CheckCircle2, Zap, Key, Settings, ShieldCheck } from 'lucide-react';
+import { Sparkles, Globe, BookOpen, Link2, CheckCircle2, Zap, Key, Settings, ShieldCheck, CalendarDays } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'curated' | 'generator' | 'backlinks' | 'seo-rules';
-  setActiveTab: (tab: 'curated' | 'generator' | 'backlinks' | 'seo-rules') => void;
+  activeTab: 'curated' | 'calendar' | 'generator' | 'backlinks' | 'seo-rules';
+  setActiveTab: (tab: 'curated' | 'calendar' | 'generator' | 'backlinks' | 'seo-rules') => void;
   hasCuratedData: boolean;
   hasGeneratedBlog: boolean;
   engineMode: 'offline' | 'cloud';
@@ -64,6 +64,22 @@ export const Header: React.FC<HeaderProps> = ({
                 {hasCuratedData && (
                   <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block ml-1"></span>
                 )}
+              </button>
+
+              <button
+                id="tab-monthly-calendar"
+                onClick={() => setActiveTab('calendar')}
+                className={`px-3 py-2 text-xs sm:text-sm font-medium rounded-lg transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'calendar'
+                    ? 'bg-stone-900 text-white shadow-sm'
+                    : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+                }`}
+              >
+                <CalendarDays className="w-4 h-4 text-amber-500" />
+                <span>30-Day Calendar</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-stone-950 font-bold text-[9px] hidden sm:inline">
+                  31d
+                </span>
               </button>
 
               <button
